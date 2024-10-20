@@ -1,0 +1,63 @@
+sudo openssl genpkey -algorithm RSA -aes128 -out vaultwarden-private-ca.key -outform PEM -pkeyopt rsa_keygen_bits:2048
+
+
+sudo openssl req -x509 -new -nodes -sha256 -days 365 -key vaultwarden-private-ca.key -out self-signed-ca-cert.crt
+
+
+Country Name: IE
+State or Province Name: Leinster
+Locality Name :Castledermot
+Organization Name: Shane MyDomain Limited
+Organizational Unit Name: IT
+Common Name: pwmanager.MyDomain.it
+Email Address: shane@MyDomain.it
+
+
+
+
+sudo openssl genpkey -algorithm RSA -out vaultwarden.key -outform PEM -pkeyopt rsa_keygen_bits:2048
+#### 
+
+sudo openssl req -new -key vaultwarden.key -out vaultwarden.csr
+
+sudo nano vaultwarden.ext
+------------------------------------------------------------------------------------------------
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:TRUE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = passman.MyDomain.it
+DNS.2 = www.passman.MyDomain.it
+-------------------------------------------------------------------------------------------------
+sudo openssl x509 -req -in vaultwarden.csr -CA self-signed-ca-cert.crt -CAkey vaultwarden-private-ca.key -CAcreateserial -out vaultwarden.crt -days 365 -sha256 -extfile vaultwarden.ext
+
+
+sudo cp vaultwarden.crt vaultwarden.key /etc/ssl/certs
+
+_____________________________________________________________________
+version: '3.7'
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    volumes:
+      - /mnt/storage/vaultwarden-sock:/var/run/docker.sock
+      - /mnt/storage/vaultwarden-data:/data
+      - /etc/ssl/certs/:/ssl/
+    environment:
+      ROCKET_TLS: '{certs="/ssl/vaultwarden.crt",key="/ssl/vaultwarden.key"}'
+    ports:
+      - "8443:80"
+
+_____________________________________________________________________
+
+Then install the root CA into the browser (Brave)
+
+Browse to https://passman.MyDomain.it:8080
+
+Done!
